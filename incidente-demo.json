@@ -1,0 +1,25 @@
+{
+  "_comentario": "Payload SIMULADO con forma similar a una exportación de incidente de Cherwell/Oracle. Datos de ejemplo, no reales.",
+  "source": "cherwell",
+  "eventType": "incident.notify_customer",
+  "sentAt": "2026-11-08T08:45:00-05:00",
+  "incident": {
+    "IncidentID": "NOC-48213",
+    "ShortDescription": "Intermitencia en enlace de datos",
+    "Priority": "2",
+    "Status": "En atención",
+    "Service": "Enlace MPLS",
+    "CreatedDateTime": "2026-11-08T08:42:00-05:00",
+    "NextUpdateDateTime": "2026-11-08T10:30:00-05:00",
+    "Location": {
+      "City": "Bogotá",
+      "Site": "Calle 93"
+    }
+  },
+  "customer": {
+    "DisplayName": "Cliente Demo S.A.S.",
+    "ContactName": "Contacto Demo",
+    "ContactPhone": "+57XXXXXXXXXX",
+    "PreferredLanguage": "es-CO"
+  }
+}
