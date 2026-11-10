@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Enviar alerta NOC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Una sola columna de trabajo: credenciales (solo en memoria) → datos de la alerta → JSON y envío */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --muted:#5d6b78; --line:#d3dae2; --field:#f7f9fb;
+  --accent:#6a3df0; --accent-ink:#ffffff; --accent-soft:#efe9ff;
+  --ok:#1f9d55; --ok-soft:#e3f5ea; --bad:#d23a3a; --bad-soft:#fdeaea; --warn:#9a6200; --warn-soft:#fff3dc;
+  --code:#141a21; --code-ink:#d6dee6; --code-key:#b59cff; --code-str:#7fd4a8;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f141a; --panel:#171e26; --ink:#e6ebf0; --muted:#94a3b1; --line:#2a3440; --field:#10161d;
+  --accent:#9b7dff; --accent-ink:#0f141a; --accent-soft:#251c45;
+  --ok:#3ccf7d; --ok-soft:#12301f; --bad:#ff6b6b; --bad-soft:#3a1a1c; --warn:#f2b04a; --warn-soft:#3a2b10;
+  --code:#0b0f14;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;
+  padding:28px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+.lead{margin:0;color:var(--muted);max-width:62ch}
+.privacy{display:flex;gap:10px;align-items:flex-start;background:var(--ok-soft);color:var(--ink);border-radius:10px;padding:12px 14px;font-size:14px}
+.privacy svg{flex:none;margin-top:2px;color:var(--ok)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+section h2{font-size:13px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 14px;font-weight:500;display:flex;gap:8px;align-items:center}
+section h2 .n{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:12px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.full{grid-column:1/-1}
+@media (max-width:620px){.grid{grid-template-columns:minmax(0,1fr)}}
+label{display:block;font-size:13.5px;font-weight:600;margin-bottom:5px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:4px}
+input,textarea{width:100%;font:inherit;font-size:14.5px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+textarea{resize:vertical;min-height:72px}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+input.mono{font-family:var(--mono);font-size:13.5px}
+.secret{-webkit-text-security:disc}
+.secret.show{-webkit-text-security:none}
+.with-btn{display:flex;gap:6px}
+.with-btn input{flex:1;min-width:0}
+.mini{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:0 12px;cursor:pointer;white-space:nowrap}
+.invalid{border-color:var(--bad)!important;background:var(--bad-soft)}
+.err{font-size:12.5px;color:var(--bad);margin-top:4px}
+details{margin-top:14px;font-size:14px}
+summary{cursor:pointer;color:var(--muted)}
+details .grid{margin-top:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:620px){details .grid{grid-template-columns:minmax(0,1fr)}}
+.counter{float:right;font-weight:400;color:var(--muted);font-family:var(--mono);font-size:12px}
+pre{margin:0;background:var(--code);color:var(--code-ink);border-radius:10px;padding:14px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow-x:auto}
+.k{color:var(--code-key)} .s{color:var(--code-str)}
+.req{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:10px 0 0;word-break:break-all}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center}
+.btn{font:inherit;font-weight:600;font-size:14.5px;border-radius:8px;padding:11px 18px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{font-size:14px;border-radius:8px;padding:10px 12px;margin-top:14px}
+.status.ok{background:var(--ok-soft);color:var(--ok)} .status.warn{background:var(--warn-soft);color:var(--warn)} .status.bad{background:var(--bad-soft);color:var(--bad)}
+footer{font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Demo · Ticketing → Voximplant Kit</div>
+    <h1>Enviar alerta NOC</h1>
+    <p class="lead">Arma el JSON de la alerta y lo inyecta como contacto en la campaña automatizada de Kit, que llama al número indicado.</p>
+  </header>
+
+  <div class="privacy" role="note">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    <div>Esta página no guarda nada: no usa cookies ni almacenamiento del navegador y no tiene servidor propio. Los datos viven solo en esta pestaña y se envían directo a Kit. Al cerrarla o pulsar “Borrar todo” desaparecen. Si el navegador ofrece guardar el token, responde que no.</div>
+  </div>
+
+  <form id="f" autocomplete="off" novalidate>
+    <section>
+      <h2><span class="n">1</span>Credenciales de Kit</h2>
+      <div class="grid">
+        <div>
+          <label for="host">Host de la API</label>
+          <input id="host" class="mono" value="https://kitapi-eu.voximplant.com" spellcheck="false" autocomplete="off" data-lpignore="true" data-1p-ignore>
+          <div class="hint">Kit → Administración → Seguridad → API tokens</div>
+        </div>
+        <div>
+          <label for="domain">Cuenta (domain)</label>
+          <input id="domain" class="mono" spellcheck="false" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="nombre-de-la-cuenta">
+        </div>
+        <div>
+          <label for="token">Token de API</label>
+          <div class="with-btn">
+            <input id="token" class="mono secret" spellcheck="false" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Pega el token">
+            <button type="button" class="mini" id="toggleToken" aria-pressed="false">Mostrar</button>
+          </div>
+        </div>
+        <div>
+          <label for="campaign">ID de la campaña</label>
+          <input id="campaign" class="mono" inputmode="numeric" autocomplete="off" placeholder="ej. 1234">
+        </div>
+      </div>
+    </section>
+
+    <section style="margin-top:18px">
+      <h2><span class="n">2</span>Datos de la alerta</h2>
+      <div class="grid">
+        <div>
+          <label for="phone">Número a llamar</label>
+          <input id="phone" class="mono" inputmode="tel" autocomplete="off" placeholder="+573001234567">
+          <div class="hint">Formato internacional con +</div>
+        </div>
+        <div>
+          <label for="sid">Session ID</label>
+          <div class="with-btn">
+            <input id="sid" class="mono" autocomplete="off" spellcheck="false">
+            <button type="button" class="mini" id="newSid">Generar</button>
+          </div>
+        </div>
+        <div class="full">
+          <label for="desc">Descripción corta <span class="counter" id="count">0/200</span></label>
+          <textarea id="desc" maxlength="200" placeholder="Intermitencia en enlace de datos, sede Calle 93. El NOC ya está trabajando en la solución."></textarea>
+          <div class="hint">Se lee por voz en la llamada.</div>
+        </div>
+      </div>
+      <details>
+        <summary>Nombres de columnas de la campaña</summary>
+        <div class="grid">
+          <div><label for="colPhone">Teléfono</label><input id="colPhone" class="mono" value="telefono"></div>
+          <div><label for="colDesc">Descripción</label><input id="colDesc" class="mono" value="descripcion"></div>
+          <div><label for="colSid">Session ID</label><input id="colSid" class="mono" value="session_id"></div>
+        </div>
+        <div class="hint">Deben coincidir con los encabezados del CSV con el que se creó la campaña en Kit.</div>
+      </details>
+    </section>
+
+    <section style="margin-top:18px">
+      <h2><span class="n">3</span>JSON y envío</h2>
+      <pre id="preview" aria-live="polite"></pre>
+      <p class="req" id="reqline"></p>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="send">Enviar a Kit</button>
+        <button type="button" class="btn" id="copy">Copiar JSON</button>
+        <button type="button" class="btn" id="clear">Borrar todo</button>
+      </div>
+      <div id="status" class="status" hidden></div>
+    </section>
+  </form>
+
+  <footer>La respuesta de Kit se abre en una pestaña nueva. Si muestra <code>"success": true</code>, el contacto entró a la campaña.</footer>
+</div>
+
+<!-- Formulario real que se envía a Kit. Se llena justo antes de enviar y se vacía después. -->
+<form id="kitForm" method="post" target="_blank" enctype="application/x-www-form-urlencoded" autocomplete="off" hidden>
+  <input type="hidden" name="domain">
+  <input type="hidden" name="access_token">
+  <input type="hidden" name="campaign_id">
+  <input type="hidden" name="rows">
+</form>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const f = $('f'), kit = $('kitForm'), statusEl = $('status');
+  const fields = ['host','domain','token','campaign','phone','sid','desc','colPhone','colDesc','colSid'];
+
+  const genSid = () => {
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    const rnd = Array.from(crypto.getRandomValues(new Uint8Array(2)), b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+    return `NOC-${d.getUTCFullYear()}${p(d.getUTCMonth()+1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}-${rnd}`;
+  };
+  const normPhone = v => v.replace(/[\s\-().]/g,'');
+  const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  function data(){
+    return {
+      telefono: normPhone($('phone').value.trim()),
+      descripcion: $('desc').value.replace(/\s+/g,' ').trim(),
+      session_id: $('sid').value.trim(),
+    };
+  }
+  function row(d){
+    return { [$('colPhone').value.trim()||'telefono']: d.telefono, [$('colDesc').value.trim()||'descripcion']: d.descripcion, [$('colSid').value.trim()||'session_id']: d.session_id };
+  }
+  function endpoint(){ return ($('host').value.trim().replace(/\/+$/,'') || 'https://kitapi-eu.voximplant.com') + '/api/v3/outbound/appendToCampaign'; }
+
+  function render(){
+    const d = data();
+    const json = JSON.stringify(d, null, 2);
+    $('preview').innerHTML = esc(json).replace(/(&quot;[^&]*?&quot;)(\s*:)/g,'<span class="k">$1</span>$2').replace(/:\s(&quot;.*?&quot;)/g,': <span class="s">$1</span>');
+    $('reqline').textContent = `POST ${endpoint()} · campaign_id=${$('campaign').value.trim() || '—'} · rows=[1 contacto]`;
+    $('count').textContent = `${$('desc').value.length}/200`;
+  }
+
+  function validate(){
+    const errs = {};
+    const host = $('host').value.trim();
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(host)) errs.host = 'Debe ser una URL https, ej. https://kitapi-eu.voximplant.com';
+    if (!$('domain').value.trim()) errs.domain = 'Falta el nombre de la cuenta.';
+    if (!$('token').value.trim()) errs.token = 'Falta el token.';
+    if (!/^\d+$/.test($('campaign').value.trim())) errs.campaign = 'El ID de campaña es numérico.';
+    const d = data();
+    if (!/^\+[1-9]\d{7,14}$/.test(d.telefono)) errs.phone = 'Formato internacional, ej. +573001234567.';
+    if (!d.descripcion) errs.desc = 'Falta la descripción.';
+    if (!/^[A-Za-z0-9._:-]{1,64}$/.test(d.session_id)) errs.sid = 'Solo letras, números y . _ : - (máx. 64).';
+    fields.forEach(id => {
+      const el = $(id); el.classList.toggle('invalid', !!errs[id]);
+      const box = el.closest('div:not(.with-btn)') || el.parentElement;
+      box.querySelector(':scope > .err')?.remove();
+      if (errs[id]) { const e = document.createElement('div'); e.className='err'; e.textContent = errs[id]; box.appendChild(e); }
+    });
+    return Object.keys(errs).length === 0;
+  }
+
+  function showStatus(kind, text){ statusEl.className = 'status ' + kind; statusEl.textContent = text; statusEl.hidden = false; }
+
+  f.addEventListener('input', e => {
+    const el = e.target;
+    if (el.classList.contains('invalid')) {
+      el.classList.remove('invalid');
+      (el.closest('div:not(.with-btn)') || el.parentElement).querySelector(':scope > .err')?.remove();
+    }
+    render(); statusEl.hidden = true;
+  });
+  $('newSid').onclick = () => { $('sid').value = genSid(); render(); };
+  $('toggleToken').onclick = e => {
+    const on = $('token').classList.toggle('show');
+    e.currentTarget.textContent = on ? 'Ocultar' : 'Mostrar';
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+  };
+
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    if (!validate()) { showStatus('bad','Revisa los campos marcados.'); return; }
+    const d = data();
+    kit.action = endpoint();
+    kit.domain.value = $('domain').value.trim();
+    kit.access_token.value = $('token').value.trim();
+    kit.campaign_id.value = $('campaign').value.trim();
+    kit.rows.value = JSON.stringify([row(d)]);
+    kit.submit();
+    // Vacía el formulario oculto apenas se envía
+    setTimeout(() => { kit.querySelectorAll('input').forEach(i => i.value=''); }, 0);
+    showStatus('ok', `Enviado a Kit con session ID ${d.session_id}. Revisa la respuesta en la pestaña nueva.`);
+    $('sid').value = genSid(); render();
+  });
+
+  $('copy').onclick = async () => {
+    const text = JSON.stringify(data(), null, 2);
+    try { await navigator.clipboard.writeText(text); showStatus('ok','JSON copiado.'); }
+    catch { const r = document.createRange(); r.selectNodeContents($('preview')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); showStatus('warn','Selecciona y copia con Ctrl/Cmd + C.'); }
+  };
+
+  function clearAll(){
+    ['domain','token','campaign','phone','desc'].forEach(id => $(id).value = '');
+    kit.querySelectorAll('input').forEach(i => i.value='');
+    $('sid').value = genSid();
+    document.querySelectorAll('.err').forEach(n => n.remove());
+    document.querySelectorAll('.invalid').forEach(n => n.classList.remove('invalid'));
+    statusEl.hidden = true; render();
+  }
+  $('clear').onclick = clearAll;
+  // Evita que el navegador restaure los valores al volver con "Atrás"
+  window.addEventListener('pageshow', e => { if (e.persisted) clearAll(); });
+  window.addEventListener('pagehide', () => { $('token').value=''; kit.querySelectorAll('input').forEach(i => i.value=''); });
+
+  $('sid').value = genSid();
+  render();
+})();
+</script>
+</body>
+</html>
